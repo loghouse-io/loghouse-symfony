@@ -1,0 +1,17 @@
+{
+    "name": "loghouse-io/loghouse-symfony",
+    "type": "symfony-bundle",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Loghouse.io",
+            "email": "support@loghouse.io"
+        }
+    ],
+    "require": {},
+    "autoload": {
+        "psr-4": {
+            "LoghouseIo\\LoghouseSymfony\\": "src/"
+        }
+    }
+}
