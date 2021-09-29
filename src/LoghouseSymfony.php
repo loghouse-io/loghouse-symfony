@@ -2,127 +2,77 @@
 
 namespace LoghouseIo\LoghouseSymfony;
 
-use DateTime;
-use LoghouseIo\LoghouseSymfony\Exceptions\LoghouseSymfonyEntryValidateException;
 
+use LoghouseIo\LoghouseSymfony\Factories\LoghouseSymfonyEntryFactory;
+use LoghouseIo\LoghouseSymfony\Models\LoghouseSymfonyConfig;
+use LoghouseIo\LoghouseSymfony\Models\LoghouseSymfonyEntriesStorage;
+use LoghouseIo\LoghouseSymfony\Utils\LoghouseSymfonyHttpClient;
+
+/**
+ * Class LoghouseSymfony
+ * @package LoghouseIo\LoghouseSymfony
+ */
 class LoghouseSymfony
 {
-    const URL = 'https://api.loghouse.io/log';
+    /**
+     * @var LoghouseSymfonyConfig
+     */
+    private $config;
 
     /**
-     * @var ?string
+     * @var LoghouseSymfonyEntriesStorage
      */
-    private $accessToken;
-
-    /**
-     * @var ?string
-     */
-    private $defaultBucketId;
-
-    /**
-     * @var array
-     */
-    private $entries = [];
+    private $entriesStorage;
 
     /**
      * LoghouseSymfony constructor.
+     * @param LoghouseSymfonyConfig $config
+     * @param LoghouseSymfonyEntriesStorage $entriesStorage
      */
-    public function __construct(string $accessToken = null, string $defaultBucketId = null)
-    {
-        $this->accessToken = $accessToken;
-        $this->defaultBucketId = $defaultBucketId;
+    public function __construct(
+        LoghouseSymfonyConfig $config,
+        LoghouseSymfonyEntriesStorage $entriesStorage
+    ) {
+        $this->config = $config;
+        $this->entriesStorage = $entriesStorage;
     }
 
     /**
-     * @param string|null $message
-     * @param array|null $metadata
-     * @param string|null $bucketId
-     */
-    public function log(
-        string $message = null,
-        array $metadata = [],
-        string $bucketId = null): void
-    {
-        if (empty($this->accessToken)) {
-            return;
-        }
-
-        $bucketId = $bucketId ?? $this->defaultBucketId;
-
-        try {
-            $this->entryValidate($bucketId, $message, $metadata);
-        } catch (LoghouseSymfonyEntryValidateException $e) {
-            return;
-        }
-
-        $this->addEntry($bucketId, $message, $metadata);
-    }
-
-    /**
-     * @param string|null $bucketId
-     * @param string|null $message
-     * @param array|null $metadata
-     * @throws LoghouseSymfonyEntryValidateException
-     */
-    private function entryValidate(
-        string $bucketId = null,
-        string $message = null,
-        array $metadata = []
-    ): void
-    {
-        if (empty($bucketId)) {
-            throw new LoghouseSymfonyEntryValidateException('Empty bucket_id');
-        }
-
-        if (empty($message)) {
-            throw new LoghouseSymfonyEntryValidateException('Empty message');
-        }
-
-        if (!is_array($metadata)) {
-            throw new LoghouseSymfonyEntryValidateException('Metadata is not array');
-        }
-    }
-
-    /**
-     * @param string $bucketId
      * @param string $message
      * @param array $metadata
      */
-    private function addEntry(
-        string $bucketId,
+    public function log(
         string $message,
         array $metadata = []
-    ): void {
-
-        $entry = [
-            'bucket_id' => $bucketId,
-            'message' => $message,
-            'timestamp' => (new DateTime())->format('c')
-        ];
-
-        if (!empty($metadata)) {
-            $entry['metadata'] = $metadata;
+    ) {
+        if (!$this->config->hasValidCredentials()) {
+            return;
         }
 
-        $this->entries[] = $entry;
+        if (empty($message)) {
+            return;
+        }
+
+        $entry = LoghouseSymfonyEntryFactory::create($this->config->getBucketId(), $message, $metadata);
+
+        $this->entriesStorage->addEntry($entry);
+
+        if ($this->config->isConsole()) {
+            $this->send();
+        }
     }
 
     public function send(): void
     {
-        if (empty($this->accessToken) || count($this->entries) == 0) {
+        if (!$this->config->hasValidCredentials() || !$this->entriesStorage->hasEntries()) {
             return;
         }
 
-        $ch = curl_init(self::URL);
+        LoghouseSymfonyHttpClient::send(
+            $this->config->getAccessToken(),
+            $this->entriesStorage->serialize()
+        );
 
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-            'access_token' => $this->accessToken,
-            'entries' => $this->entries
-        ]));
-
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type:application/json'));
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_exec($ch);
-        curl_close($ch);
+        $this->entriesStorage->reset();
     }
 }

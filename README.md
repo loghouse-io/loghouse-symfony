@@ -16,8 +16,8 @@ composer require loghouse-io/loghouse-symfony
 
 1. You need to add 2 parameters to the .env file
 ```
-LOGHOUSE_SYMFONY_ACCESS_TOKEN={LOGHOUSE_SYMFONY_ACCESS_TOKEN}
-LOGHOUSE_SYMFONY_BUCKET_ID={LOGHOUSE_SYMFONY_BUCKET_ID}
+LOGHOUSE_SYMFONY_ACCESS_TOKEN=${LOGHOUSE_SYMFONY_ACCESS_TOKEN}
+LOGHOUSE_SYMFONY_BUCKET_ID=${LOGHOUSE_SYMFONY_BUCKET_ID}
 ```
 2. You must register a new service in services.yaml
 ```php
